@@ -26,6 +26,8 @@ public class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(24, 24, 24, 24);
 
+        NavigationBar.addTo(this, layout);
+
         TextView title = new TextView(this);
         title.setText("Smart Pantry — My Pantry");
         title.setTextSize(24);

@@ -7,186 +7,280 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 public class PantryDatabase extends SQLiteOpenHelper {
+    private static final String DATABASE_NAME = "pantry.db";
+    private static final int DATABASE_VERSION = 3;
+
     public PantryDatabase(Context context) {
-        super(context, "pantry.db", null, 1);
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE pantry (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                "name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL)");
-
-        db.execSQL("CREATE TABLE recipes (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                "name TEXT NOT NULL, steps TEXT NOT NULL)");
-
-        db.execSQL("CREATE TABLE recipe_ingredients (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER, " +
-                "name TEXT, quantity REAL, unit TEXT)");
-
-        seedRecipes(db);
+        createTables(db);
+        seedDemoData(db);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS recipe_ingredients");
-        db.execSQL("DROP TABLE IF EXISTS recipes");
-        db.execSQL("DROP TABLE IF EXISTS pantry");
-        onCreate(db);
+        // Create any missing tables without deleting existing user data.
+        createTables(db);
+        seedDemoData(db);
     }
 
-    private void seedRecipes(SQLiteDatabase db) {
-        addRecipe(db, "Tomato Pasta", "Boil pasta. Cook tomatoes in a pan. Mix together.",
+    private void createTables(SQLiteDatabase db) {
+        db.execSQL(
+                "CREATE TABLE IF NOT EXISTS pantry (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "name TEXT NOT NULL, " +
+                        "quantity REAL NOT NULL, " +
+                        "unit TEXT NOT NULL)"
+        );
+
+        db.execSQL(
+                "CREATE TABLE IF NOT EXISTS recipes (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "name TEXT NOT NULL, " +
+                        "steps TEXT NOT NULL)"
+        );
+
+        db.execSQL(
+                "CREATE TABLE IF NOT EXISTS recipe_ingredients (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "recipe_id INTEGER NOT NULL, " +
+                        "name TEXT NOT NULL, " +
+                        "quantity REAL NOT NULL, " +
+                        "unit TEXT NOT NULL)"
+        );
+    }
+
+    private void seedDemoData(SQLiteDatabase db) {
+        Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM pantry", null);
+        boolean pantryIsEmpty;
+
+        try {
+            pantryIsEmpty = countCursor.moveToFirst() && countCursor.getInt(0) == 0;
+        } finally {
+            countCursor.close();
+        }
+
+        if (pantryIsEmpty) {
+            insertDemoPantryItem(db, "tomato", 2, "each");
+            insertDemoPantryItem(db, "pasta", 200, "g");
+            insertDemoPantryItem(db, "olive oil", 1, "tbsp");
+            insertDemoPantryItem(db, "cheese", 50, "g");
+        }
+
+        addDemoRecipeIfMissing(
+                db,
+                "One-Ingredient Tomato",
+                "Slice and eat the tomato, or warm it in a pan.",
+                new String[]{"tomato"},
+                new double[]{1},
+                new String[]{"each"}
+        );
+
+        addDemoRecipeIfMissing(
+                db,
+                "Tomato Pasta",
+                "Boil the pasta. Warm the tomato and olive oil in a pan, then combine.",
                 new String[]{"pasta", "tomato", "olive oil"},
-                new double[]{200, 2, 1}, new String[]{"g", "each", "tbsp"});
+                new double[]{200, 2, 1},
+                new String[]{"g", "each", "tbsp"}
+        );
 
-        addRecipe(db, "Cheese Omelette", "Beat eggs. Cook in a pan and add cheese.",
-                new String[]{"egg", "cheese", "butter"},
-                new double[]{2, 30, 1}, new String[]{"each", "g", "tsp"});
-
-        addRecipe(db, "Banana Oatmeal", "Cook oats with milk. Add sliced banana.",
-                new String[]{"oats", "milk", "banana"},
-                new double[]{50, 200, 1}, new String[]{"g", "ml", "each"});
-
-        addRecipe(db, "Garlic Rice", "Cook rice. Fry with garlic and oil.",
-                new String[]{"rice", "garlic", "olive oil"},
-                new double[]{150, 1, 1}, new String[]{"g", "clove", "tbsp"});
-
-        addRecipe(db, "Peanut Butter Toast", "Toast bread and spread peanut butter.",
-                new String[]{"bread", "peanut butter"},
-                new double[]{2, 2}, new String[]{"slice", "tbsp"});
-
-        addRecipe(db, "Apple Yogurt Bowl", "Chop the apple and serve with yogurt.",
-                new String[]{"apple", "yogurt"},
-                new double[]{1, 150}, new String[]{"each", "g"});
-
-        addRecipe(db, "Cheese Sandwich", "Put cheese between bread slices.",
+        addDemoRecipeIfMissing(
+                db,
+                "Cheese Sandwich",
+                "Put the cheese between two slices of bread.",
                 new String[]{"bread", "cheese"},
-                new double[]{2, 40}, new String[]{"slice", "g"});
-
-        addRecipe(db, "Tomato Egg Scramble", "Cook chopped tomatoes and eggs together.",
-                new String[]{"tomato", "egg", "olive oil"},
-                new double[]{1, 2, 1}, new String[]{"each", "each", "tsp"});
-
-        addRecipe(db, "Garlic Bread", "Spread garlic butter on bread and toast.",
-                new String[]{"bread", "garlic", "butter"},
-                new double[]{2, 1, 1}, new String[]{"slice", "clove", "tbsp"});
-
-        addRecipe(db, "Simple Pancakes", "Mix ingredients and cook small pancakes.",
-                new String[]{"flour", "milk", "egg"},
-                new double[]{100, 150, 1}, new String[]{"g", "ml", "each"});
-
-        addRecipe(db, "Yogurt Banana Bowl", "Slice banana and mix with yogurt.",
-                new String[]{"banana", "yogurt"},
-                new double[]{1, 150}, new String[]{"each", "g"});
-
-        addRecipe(db, "Rice and Egg", "Cook rice and top with a fried egg.",
-                new String[]{"rice", "egg", "olive oil"},
-                new double[]{150, 1, 1}, new String[]{"g", "each", "tsp"});
-
-        addRecipe(db, "Apple Oatmeal", "Cook oats with milk. Add chopped apple.",
-                new String[]{"oats", "milk", "apple"},
-                new double[]{50, 200, 1}, new String[]{"g", "ml", "each"});
-
-        addRecipe(db, "Tomato Cheese Toast", "Top bread with tomato and cheese. Toast.",
-                new String[]{"bread", "tomato", "cheese"},
-                new double[]{2, 1, 30}, new String[]{"slice", "each", "g"});
-
-        addRecipe(db, "Peanut Banana Toast", "Spread peanut butter on toast and add banana.",
-                new String[]{"bread", "peanut butter", "banana"},
-                new double[]{2, 1, 1}, new String[]{"slice", "tbsp", "each"});
+                new double[]{2, 30},
+                new String[]{"slice", "g"}
+        );
     }
 
-    private void addRecipe(SQLiteDatabase db, String name, String steps,
-                           String[] ingredients, double[] quantities, String[] units) {
-        ContentValues recipeValues = new ContentValues();
-        recipeValues.put("name", name);
-        recipeValues.put("steps", steps);
-        long recipeId = db.insert("recipes", null, recipeValues);
+    private void insertDemoPantryItem(
+            SQLiteDatabase db, String name, double quantity, String unit) {
+        ContentValues values = new ContentValues();
+        values.put("name", name);
+        values.put("quantity", quantity);
+        values.put("unit", unit);
+        db.insert("pantry", null, values);
+    }
 
-        for (int i = 0; i < ingredients.length; i++) {
-            ContentValues item = new ContentValues();
-            item.put("recipe_id", recipeId);
-            item.put("name", ingredients[i]);
-            item.put("quantity", quantities[i]);
-            item.put("unit", units[i]);
-            db.insert("recipe_ingredients", null, item);
+    private void addDemoRecipeIfMissing(
+            SQLiteDatabase db,
+            String name,
+            String steps,
+            String[] ingredients,
+            double[] quantities,
+            String[] units) {
+
+        Cursor cursor = db.rawQuery(
+                "SELECT id FROM recipes WHERE name=?",
+                new String[]{name}
+        );
+
+        boolean exists;
+        try {
+            exists = cursor.moveToFirst();
+        } finally {
+            cursor.close();
+        }
+
+        if (!exists) {
+            insertRecipe(db, name, steps, ingredients, quantities, units);
+        }
+    }
+
+    private long insertRecipe(
+            SQLiteDatabase db,
+            String name,
+            String steps,
+            String[] ingredients,
+            double[] quantities,
+            String[] units) {
+
+        if (ingredients.length != quantities.length
+                || ingredients.length != units.length) {
+            return -1;
+        }
+
+        db.beginTransaction();
+        try {
+            ContentValues recipeValues = new ContentValues();
+            recipeValues.put("name", name);
+            recipeValues.put("steps", steps);
+
+            long recipeId = db.insert("recipes", null, recipeValues);
+            if (recipeId == -1) {
+                return -1;
+            }
+
+            for (int i = 0; i < ingredients.length; i++) {
+                ContentValues item = new ContentValues();
+                item.put("recipe_id", recipeId);
+                item.put("name", ingredients[i]);
+                item.put("quantity", quantities[i]);
+                item.put("unit", units[i]);
+
+                if (db.insert("recipe_ingredients", null, item) == -1) {
+                    return -1;
+                }
+            }
+
+            db.setTransactionSuccessful();
+            return recipeId;
+        } finally {
+            db.endTransaction();
         }
     }
 
     public long addIngredient(String name, double quantity, String unit) {
+        if (name == null || name.trim().isEmpty()) {
+            return -1;
+        }
+        if (unit == null || unit.trim().isEmpty()) {
+            return -1;
+        }
+        if (quantity < 0 || Double.isNaN(quantity) || Double.isInfinite(quantity)) {
+            return -1;
+        }
+
         ContentValues values = new ContentValues();
         values.put("name", name.trim());
         values.put("quantity", quantity);
-        values.put("unit", unit.trim().toLowerCase());
+        values.put("unit", unit.trim().toLowerCase(Locale.ROOT));
+
         return getWritableDatabase().insert("pantry", null, values);
     }
 
     public int updateIngredient(int id, String name, double quantity, String unit) {
+        if (id <= 0 || name == null || name.trim().isEmpty()
+                || unit == null || unit.trim().isEmpty()
+                || quantity < 0 || Double.isNaN(quantity) || Double.isInfinite(quantity)) {
+            return 0;
+        }
+
         ContentValues values = new ContentValues();
         values.put("name", name.trim());
         values.put("quantity", quantity);
-        values.put("unit", unit.trim().toLowerCase());
-        return getWritableDatabase().update("pantry", values, "id=?",
-                new String[]{String.valueOf(id)});
+        values.put("unit", unit.trim().toLowerCase(Locale.ROOT));
+
+        return getWritableDatabase().update(
+                "pantry",
+                values,
+                "id=?",
+                new String[]{String.valueOf(id)}
+        );
     }
 
     public int deleteIngredient(int id) {
-        return getWritableDatabase().delete("pantry", "id=?",
-                new String[]{String.valueOf(id)});
+        return getWritableDatabase().delete(
+                "pantry",
+                "id=?",
+                new String[]{String.valueOf(id)}
+        );
     }
 
     public List<Ingredient> getIngredients() {
         List<Ingredient> result = new ArrayList<>();
-        Cursor c = getReadableDatabase().rawQuery(
-                "SELECT id, name, quantity, unit FROM pantry ORDER BY name", null);
 
-        try {
-            while (c.moveToNext()) {
-                result.add(new Ingredient(c.getInt(0), c.getString(1),
-                        c.getDouble(2), c.getString(3)));
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT id, name, quantity, unit FROM pantry ORDER BY name",
+                null
+        )) {
+            while (cursor.moveToNext()) {
+                result.add(new Ingredient(
+                        cursor.getInt(0),
+                        cursor.getString(1),
+                        cursor.getDouble(2),
+                        cursor.getString(3)
+                ));
             }
-        } finally {
-            c.close();
         }
+
         return result;
     }
 
     public List<Recipe> getRecipes() {
         List<Recipe> result = new ArrayList<>();
         SQLiteDatabase db = getReadableDatabase();
-        Cursor recipes = db.rawQuery("SELECT id, name, steps FROM recipes", null);
 
-        try {
+        try (Cursor recipes = db.rawQuery(
+                "SELECT id, name, steps FROM recipes ORDER BY name",
+                null
+        )) {
             while (recipes.moveToNext()) {
-                int id = recipes.getInt(0);
+                int recipeId = recipes.getInt(0);
                 List<Recipe.RecipeIngredient> items = new ArrayList<>();
-                Cursor ingredients = db.rawQuery(
-                        "SELECT name, quantity, unit FROM recipe_ingredients WHERE recipe_id=?",
-                        new String[]{String.valueOf(id)});
 
-                try {
+                try (Cursor ingredients = db.rawQuery(
+                        "SELECT name, quantity, unit " +
+                                "FROM recipe_ingredients WHERE recipe_id=?",
+                        new String[]{String.valueOf(recipeId)}
+                )) {
                     while (ingredients.moveToNext()) {
                         items.add(new Recipe.RecipeIngredient(
                                 ingredients.getString(0),
                                 ingredients.getDouble(1),
-                                ingredients.getString(2)));
+                                ingredients.getString(2)
+                        ));
                     }
-                } finally {
-                    ingredients.close();
                 }
 
-                result.add(new Recipe(id, recipes.getString(1),
-                        recipes.getString(2), items));
+                result.add(new Recipe(
+                        recipeId,
+                        recipes.getString(1),
+                        recipes.getString(2),
+                        items
+                ));
             }
-        } finally {
-            recipes.close();
         }
+
         return result;
     }
 }

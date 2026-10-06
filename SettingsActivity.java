@@ -15,6 +15,8 @@ public class SettingsActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(24, 24, 24, 24);
 
+        NavigationBar.addTo(this, layout);
+
         TextView title = new TextView(this);
         title.setText("Settings");
         title.setTextSize(24);

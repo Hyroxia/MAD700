@@ -25,6 +25,8 @@ public class RecipeDetailActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(24, 24, 24, 24);
 
+        NavigationBar.addTo(this, layout);
+
         if (selected == null) {
             TextView error = new TextView(this);
             error.setText("Recipe not found.");
