@@ -12,7 +12,7 @@ import java.util.Locale;
 
 public class PantryDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "pantry.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     public PantryDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -26,7 +26,7 @@ public class PantryDatabase extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Create any missing tables without deleting existing user data.
+        // Create missing tables without deleting existing pantry data.
         createTables(db);
         seedDemoData(db);
     }
@@ -58,13 +58,13 @@ public class PantryDatabase extends SQLiteOpenHelper {
     }
 
     private void seedDemoData(SQLiteDatabase db) {
-        Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM pantry", null);
+        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM pantry", null);
         boolean pantryIsEmpty;
 
         try {
-            pantryIsEmpty = countCursor.moveToFirst() && countCursor.getInt(0) == 0;
+            pantryIsEmpty = cursor.moveToFirst() && cursor.getInt(0) == 0;
         } finally {
-            countCursor.close();
+            cursor.close();
         }
 
         if (pantryIsEmpty) {
@@ -161,13 +161,17 @@ public class PantryDatabase extends SQLiteOpenHelper {
             }
 
             for (int i = 0; i < ingredients.length; i++) {
-                ContentValues item = new ContentValues();
-                item.put("recipe_id", recipeId);
-                item.put("name", ingredients[i]);
-                item.put("quantity", quantities[i]);
-                item.put("unit", units[i]);
+                ContentValues ingredientValues = new ContentValues();
+                ingredientValues.put("recipe_id", recipeId);
+                ingredientValues.put("name", ingredients[i]);
+                ingredientValues.put("quantity", quantities[i]);
+                ingredientValues.put("unit", units[i]);
 
-                if (db.insert("recipe_ingredients", null, item) == -1) {
+                if (db.insert(
+                        "recipe_ingredients",
+                        null,
+                        ingredientValues
+                ) == -1) {
                     return -1;
                 }
             }
@@ -180,13 +184,7 @@ public class PantryDatabase extends SQLiteOpenHelper {
     }
 
     public long addIngredient(String name, double quantity, String unit) {
-        if (name == null || name.trim().isEmpty()) {
-            return -1;
-        }
-        if (unit == null || unit.trim().isEmpty()) {
-            return -1;
-        }
-        if (quantity < 0 || Double.isNaN(quantity) || Double.isInfinite(quantity)) {
+        if (!isValidIngredient(name, quantity, unit)) {
             return -1;
         }
 
@@ -199,9 +197,7 @@ public class PantryDatabase extends SQLiteOpenHelper {
     }
 
     public int updateIngredient(int id, String name, double quantity, String unit) {
-        if (id <= 0 || name == null || name.trim().isEmpty()
-                || unit == null || unit.trim().isEmpty()
-                || quantity < 0 || Double.isNaN(quantity) || Double.isInfinite(quantity)) {
+        if (id <= 0 || !isValidIngredient(name, quantity, unit)) {
             return 0;
         }
 
@@ -219,11 +215,25 @@ public class PantryDatabase extends SQLiteOpenHelper {
     }
 
     public int deleteIngredient(int id) {
+        if (id <= 0) {
+            return 0;
+        }
+
         return getWritableDatabase().delete(
                 "pantry",
                 "id=?",
                 new String[]{String.valueOf(id)}
         );
+    }
+
+    private boolean isValidIngredient(String name, double quantity, String unit) {
+        return name != null
+                && !name.trim().isEmpty()
+                && unit != null
+                && !unit.trim().isEmpty()
+                && quantity >= 0
+                && !Double.isNaN(quantity)
+                && !Double.isInfinite(quantity);
     }
 
     public List<Ingredient> getIngredients() {
@@ -256,18 +266,18 @@ public class PantryDatabase extends SQLiteOpenHelper {
         )) {
             while (recipes.moveToNext()) {
                 int recipeId = recipes.getInt(0);
-                List<Recipe.RecipeIngredient> items = new ArrayList<>();
+                List<Recipe.RecipeIngredient> ingredients = new ArrayList<>();
 
-                try (Cursor ingredients = db.rawQuery(
+                try (Cursor items = db.rawQuery(
                         "SELECT name, quantity, unit " +
                                 "FROM recipe_ingredients WHERE recipe_id=?",
                         new String[]{String.valueOf(recipeId)}
                 )) {
-                    while (ingredients.moveToNext()) {
-                        items.add(new Recipe.RecipeIngredient(
-                                ingredients.getString(0),
-                                ingredients.getDouble(1),
-                                ingredients.getString(2)
+                    while (items.moveToNext()) {
+                        ingredients.add(new Recipe.RecipeIngredient(
+                                items.getString(0),
+                                items.getDouble(1),
+                                items.getString(2)
                         ));
                     }
                 }
@@ -276,7 +286,7 @@ public class PantryDatabase extends SQLiteOpenHelper {
                         recipeId,
                         recipes.getString(1),
                         recipes.getString(2),
-                        items
+                        ingredients
                 ));
             }
         }

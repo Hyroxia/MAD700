@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -13,70 +12,89 @@ import android.widget.TextView;
 import java.util.List;
 
 public class MainActivity extends Activity {
-    PantryDatabase database;
-    ListView listView;
-    List<Ingredient> ingredients;
+    private PantryDatabase database;
+    private ListView pantryList;
+    private TextView emptyMessage;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+
         database = new PantryDatabase(this);
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(24, 24, 24, 24);
+        layout.setPadding(16, 16, 16, 16);
 
         NavigationBar.addTo(this, layout);
 
         TextView title = new TextView(this);
-        title.setText("Smart Pantry — My Pantry");
-        title.setTextSize(24);
+        title.setText("My Pantry");
+        title.setTextSize(26);
+        title.setPadding(4, 16, 4, 8);
         layout.addView(title);
 
-        addButton(layout, "Add ingredient", AddIngredientActivity.class);
-        addButton(layout, "Suggested recipes", SuggestionsActivity.class);
-        addButton(layout, "Settings", SettingsActivity.class);
+        TextView hint = new TextView(this);
+        hint.setText("Tap an ingredient to edit it. Use −1 or Delete to update your pantry.");
+        layout.addView(hint);
 
-        listView = new ListView(this);
-        layout.addView(listView, new LinearLayout.LayoutParams(
+        Button addButton = new Button(this);
+        addButton.setText("＋ Add ingredient");
+        addButton.setOnClickListener(v ->
+                startActivity(new Intent(this, AddIngredientActivity.class)));
+        layout.addView(addButton);
+
+        emptyMessage = new TextView(this);
+        emptyMessage.setText("Your pantry is empty. Add an ingredient to get started.");
+        emptyMessage.setTextSize(16);
+        emptyMessage.setPadding(4, 16, 4, 16);
+        layout.addView(emptyMessage);
+
+        pantryList = new ListView(this);
+        layout.addView(pantryList, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
 
         setContentView(layout);
+
+        pantryList.setOnItemClickListener((parent, view, position, id) -> {
+            List<Ingredient> items = database.getIngredients();
+            if (position < items.size()) {
+                Ingredient item = items.get(position);
+
+                Intent intent = new Intent(this, AddIngredientActivity.class);
+                intent.putExtra("id", item.id);
+                intent.putExtra("name", item.name);
+                intent.putExtra("quantity", item.quantity);
+                intent.putExtra("unit", item.unit);
+                startActivity(intent);
+            }
+        });
+
         refreshList();
     }
 
-    private void addButton(LinearLayout layout, String label, Class<?> screen) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setOnClickListener(v -> startActivity(new Intent(this, screen)));
-        layout.addView(button);
-    }
-
     private void refreshList() {
-        ingredients = database.getIngredients();
-        listView.setAdapter(new ArrayAdapter<>(
-                this, android.R.layout.simple_list_item_1, ingredients));
+        List<Ingredient> ingredients = database.getIngredients();
 
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            Ingredient item = ingredients.get(position);
-            Intent intent = new Intent(this, AddIngredientActivity.class);
-            intent.putExtra("id", item.id);
-            intent.putExtra("name", item.name);
-            intent.putExtra("quantity", item.quantity);
-            intent.putExtra("unit", item.unit);
-            startActivity(intent);
-        });
+        emptyMessage.setVisibility(ingredients.isEmpty()
+                ? TextView.VISIBLE : TextView.GONE);
 
-        listView.setOnItemLongClickListener((parent, view, position, id) -> {
-            database.deleteIngredient(ingredients.get(position).id);
-            refreshList();
-            return true;
-        });
+        PantryAdapter adapter = new PantryAdapter(
+                this,
+                database,
+                ingredients,
+                this::refreshList
+        );
+
+        pantryList.setAdapter(adapter);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (database != null && listView != null) refreshList();
+
+        if (database != null && pantryList != null) {
+            refreshList();
+        }
     }
 }
